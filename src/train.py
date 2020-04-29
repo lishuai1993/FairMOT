@@ -40,7 +40,7 @@ def main(opt):
     opt.device = torch.device('cuda' if opt.gpus[0] >= 0 else 'cpu')
 
     print('Creating model...')
-    model = create_model(opt.arch, opt.heads, opt.head_conv)
+    model = create_model(opt.arch, opt.heads, opt.head_conv)        # dla34，检测的三个heads，id embedding的一个head
     optimizer = torch.optim.Adam(model.parameters(), opt.lr)
     start_epoch = 0
     if opt.load_model != '':
@@ -92,6 +92,10 @@ def main(opt):
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1'
-    opt = opts().parse()
-    main(opt)
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1'
+    # opt = opts().parse()
+    # main(opt)
+
+
+
+

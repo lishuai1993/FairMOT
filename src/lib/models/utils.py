@@ -10,9 +10,9 @@ def _sigmoid(x):
   return y
 
 def _gather_feat(feat, ind, mask=None):
-    dim  = feat.size(2)
-    ind  = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)
-    feat = feat.gather(1, ind)
+    dim  = feat.size(2)                                             # 2, torch.Size([1, 41344, 512])
+    ind  = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)   # torch.Size([1, 128, 512])
+    feat = feat.gather(1, ind)                                      # feat torch.Size([1, 128, 512])
     if mask is not None:
         mask = mask.unsqueeze(2).expand_as(feat)
         feat = feat[mask]
@@ -20,8 +20,8 @@ def _gather_feat(feat, ind, mask=None):
     return feat
 
 def _tranpose_and_gather_feat(feat, ind):
-    feat = feat.permute(0, 2, 3, 1).contiguous()
-    feat = feat.view(feat.size(0), -1, feat.size(3))
+    feat = feat.permute(0, 2, 3, 1).contiguous()            # ind torch.Size([1, 128])
+    feat = feat.view(feat.size(0), -1, feat.size(3))        # torch.Size([1, 41344, 512])
     feat = _gather_feat(feat, ind)
     return feat
 
@@ -41,7 +41,7 @@ def flip_lr(x, flip_idx):
 def flip_lr_off(x, flip_idx):
   tmp = x.detach().cpu().numpy()[..., ::-1].copy()
   shape = tmp.shape
-  tmp = tmp.reshape(tmp.shape[0], 17, 2, 
+  tmp = tmp.reshape(tmp.shape[0], 17, 2,
                     tmp.shape[2], tmp.shape[3])
   tmp[:, :, 0, :, :] *= -1
   for e in flip_idx:

@@ -120,7 +120,8 @@ class opts(object):
     self.parser.add_argument('--data_cfg', type=str,
                              default='../src/lib/cfg/data.json',
                              help='load data from cfg')
-    self.parser.add_argument('--data_dir', type=str, default='/data/yfzhang/MOT/JDE')
+    # self.parser.add_argument('--data_dir', type=str, default='/data/yfzhang/MOT/JDE')
+    self.parser.add_argument('--data_dir', type=str, default='/home/shuai.li/code/FairMOT')
 
     # loss
     self.parser.add_argument('--mse_loss', action='store_true',
@@ -165,10 +166,10 @@ class opts(object):
 
     opt.fix_res = not opt.keep_res
     print('Fix size testing.' if opt.fix_res else 'Keep resolution testing.')
-    opt.reg_offset = not opt.not_reg_offset
+    opt.reg_offset = not opt.not_reg_offset                     # 将设置 center offset head
 
     if opt.head_conv == -1: # init default head_conv
-      opt.head_conv = 256 if 'dla' in opt.arch else 256
+      opt.head_conv = 256 if 'dla' in opt.arch else 256         # head的conv输出的channel=256
     opt.pad = 31
     opt.num_stacks = 1
 
@@ -213,11 +214,11 @@ class opts(object):
     opt.input_res = max(opt.input_h, opt.input_w)
     opt.output_res = max(opt.output_h, opt.output_w)
 
-    if opt.task == 'mot':
-      opt.heads = {'hm': opt.num_classes,
-                   'wh': 2 if not opt.cat_spec_wh else 2 * opt.num_classes,
-                   'id': opt.reid_dim}
-      if opt.reg_offset:
+    if opt.task == 'mot':                           # 在 opt 中设置默认的 heads，以字典的形式
+      opt.heads = {'hm': opt.num_classes,           # heatmap
+                   'wh': 2 if not opt.cat_spec_wh else 2 * opt.num_classes,     # box size head
+                   'id': opt.reid_dim}              # 卷积层输出的channel == 128
+      if opt.reg_offset:                            # 设置center offset head
         opt.heads.update({'reg': 2})
       opt.nID = dataset.nID
       opt.img_size = (1088, 608)

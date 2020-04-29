@@ -22,10 +22,12 @@ import datasets.dataset.jde as datasets
 from tracking_utils.utils import mkdir_if_missing
 from opts import opts
 
+from tqdm import tqdm
+
 
 def write_results(filename, results, data_type):
     if data_type == 'mot':
-        save_format = '{frame},{id},{x1},{y1},{w},{h},1,-1,-1,-1\n'
+        save_format = '{frame},{id},{x1},{y1},{w},{h},1,-1,-1,-1\n'         # 格式化，按照{w}中的字符，匹配 .format()中的变量
     elif data_type == 'kitti':
         save_format = '{frame} {id} pedestrian 0 0 -10 {x1} {y1} {x2} {y2} -10 -10 -10 -1000 -1000 -1000 -10\n'
     else:
@@ -45,23 +47,26 @@ def write_results(filename, results, data_type):
     logger.info('save results to {}'.format(filename))
 
 
-def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_image=True, frame_rate=30):
+def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_image=True, frame_rate=30):       # 对序列图像进行，进行推理评估
     if save_dir:
         mkdir_if_missing(save_dir)
-    tracker = JDETracker(opt, frame_rate=frame_rate)
-    timer = Timer()
-    results = []
-    frame_id = 0
-    for path, img, img0 in dataloader:
-        if frame_id % 20 == 0:
+    tracker = JDETracker(opt, frame_rate=frame_rate)                    # 创建追踪器，加载model对每一帧推理边框、heatmap、目标中心偏移量、id特征
+    timer = Timer()                                                     # 并创建堆栈，开始目标追踪，
+    results = []                                                        # 计算并统计正确检出的样本数量、误检样本数量、漏检样本数量，id转变数量、轨迹跳变数量等
+    frame_id = 0                                                        # 将统计的结果，送入标准的motmetrics中，进行mot challenge标准指标的计算
+    # 原始图像padding、resize，对每一个eval文件夹分别生成一个dataloader，
+    for path, img, img0 in dataloader:       # 图像path， RGB格式并转换为(c, h, w)维度，cv2.imread的图像，BGR(h, w, c)
+        if frame_id % 100 == 0:
             logger.info('Processing frame {} ({:.2f} fps)'.format(frame_id, 1. / max(1e-5, timer.average_time)))
 
         # run tracking
         timer.tic()
         blob = torch.from_numpy(img).cuda().unsqueeze(0)
-        online_targets = tracker.update(blob, img0)
+
+        online_targets = tracker.update(blob, img0)                     # 核心部分，对当前帧进行检测追踪，在multitracker模块中
         online_tlwhs = []
         online_ids = []
+
         for t in online_targets:
             tlwh = t.tlwh
             tid = t.track_id
@@ -70,8 +75,9 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
                 online_tlwhs.append(tlwh)
                 online_ids.append(tid)
         timer.toc()
+
         # save results
-        results.append((frame_id + 1, online_tlwhs, online_ids))
+        results.append((frame_id + 1, online_tlwhs, online_ids))        # 当前帧序号，检测框的left、top、width、height、id
         if show_image or save_dir is not None:
             online_im = vis.plot_tracking(img0, online_tlwhs, online_ids, frame_id=frame_id,
                                           fps=1. / timer.average_time)
@@ -79,9 +85,9 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
             cv2.imshow('online_im', online_im)
         if save_dir is not None:
             cv2.imwrite(os.path.join(save_dir, '{:05d}.jpg'.format(frame_id)), online_im)
-        frame_id += 1
+        frame_id += 1                                                   # 必须在存储图像之后，再更新帧id
     # save results
-    write_results(result_filename, results, data_type)
+    write_results(result_filename, results, data_type)                  # 将检测追踪结果，存储成类似gt形式的文件
     return frame_id, timer.average_time, timer.calls
 
 
@@ -96,13 +102,15 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
     accs = []
     n_frame = 0
     timer_avgs, timer_calls = [], []
-    for seq in seqs:
+    for seq in tqdm(seqs):                              # seqs = 11个验证集(KITTI-13)
         output_dir = os.path.join(data_root, '..', 'outputs', exp_name, seq) if save_images or save_videos else None
         logger.info('start seq: {}'.format(seq))
         dataloader = datasets.LoadImages(osp.join(data_root, seq, 'img1'), opt.img_size)
+
         result_filename = os.path.join(result_root, '{}.txt'.format(seq))
-        meta_info = open(os.path.join(data_root, seq, 'seqinfo.ini')).read()
-        frame_rate = int(meta_info[meta_info.find('frameRate') + 10:meta_info.find('\nseqLength')])
+        meta_info = open(os.path.join(data_root, seq, 'seqinfo.ini')).read()                # 帧序列的数量，帧宽高，序列名称，相对路径
+        frame_rate = int(meta_info[meta_info.find('frameRate') + 10:meta_info.find('\nseqLength')])     # 帧率转成正整数
+
         nf, ta, tc = eval_seq(opt, dataloader, data_type, result_filename,
                               save_dir=output_dir, show_image=show_image, frame_rate=frame_rate)
         n_frame += nf
@@ -111,8 +119,8 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
 
         # eval
         logger.info('Evaluate seq: {}'.format(seq))
-        evaluator = Evaluator(data_root, seq, data_type)
-        accs.append(evaluator.eval_file(result_filename))
+        evaluator = Evaluator(data_root, seq, data_type)    # 在初始化中，根据data_root,seq自动加载ground truth数据
+        accs.append(evaluator.eval_file(result_filename))   # 在读取存储的检测结果，并进行计算，一帧对应一个acc对象
         if save_videos:
             output_video_path = osp.join(output_dir, '{}.mp4'.format(seq))
             cmd_str = 'ffmpeg -f image2 -i {}/%05d.jpg -c:v copy {}'.format(output_dir, output_video_path)
@@ -121,18 +129,18 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
     timer_calls = np.asarray(timer_calls)
     all_time = np.dot(timer_avgs, timer_calls)
     avg_time = all_time / np.sum(timer_calls)
-    logger.info('Time elapsed: {:.2f} seconds, FPS: {:.2f}'.format(all_time, 1.0 / avg_time))
+    logger.info('Time elapsed: {:.2f} seconds, FPS: {:.2f}'.format(all_time, 1.0 / avg_time))       # 打印结果
 
     # get summary
-    metrics = mm.metrics.motchallenge_metrics
-    mh = mm.metrics.create()
-    summary = Evaluator.get_summary(accs, seqs, metrics)
-    strsummary = mm.io.render_summary(
+    metrics = mm.metrics.motchallenge_metrics               # 18个评价指标
+    mh = mm.metrics.create()                                # 创建指标计算工厂，后续传入相关数据即可给出指标
+    summary = Evaluator.get_summary(accs, seqs, metrics)    # 计算MOT challenge中的指标，参数：、eval的帧序列名称、指标序列
+    strsummary = mm.io.render_summary(                      # 将eval指标进行字符串格式化，用于在console上面的显示
         summary,
         formatters=mh.formatters,
         namemap=mm.io.motchallenge_metric_names
     )
-    print(strsummary)
+    print(strsummary)                                       # 显示在命令行中
     Evaluator.save_summary(summary, os.path.join(result_root, 'summary_{}.xlsx'.format(exp_name)))
 
 
@@ -167,16 +175,18 @@ if __name__ == '__main__':
                       MOT16-14'''
         data_root = os.path.join(opt.data_dir, 'MOT16/test')
     if opt.test_mot15:
+        # seqs_str = '''ADL-Rundle-1
+        #               ADL-Rundle-3
+        #               AVG-TownCentre
+        #               ETH-Crossing
+        #               ETH-Jelmoli
+        #               ETH-Linthescher
+        #               KITTI-16
+        #               KITTI-19
+        #               PETS09-S2L2
+        #               TUD-Crossing
+        #               Venice-1'''
         seqs_str = '''ADL-Rundle-1
-                      ADL-Rundle-3
-                      AVG-TownCentre
-                      ETH-Crossing
-                      ETH-Jelmoli
-                      ETH-Linthescher
-                      KITTI-16
-                      KITTI-19
-                      PETS09-S2L2
-                      TUD-Crossing
                       Venice-1'''
         data_root = os.path.join(opt.data_dir, 'MOT15/images/test')
     if opt.test_mot17:
@@ -226,10 +236,11 @@ if __name__ == '__main__':
         data_root = os.path.join(opt.data_dir, 'MOT20/images/test')
     seqs = [seq.strip() for seq in seqs_str.split()]
 
+    print("data_root is:\t{0}\nseq is:\t{1}".format(data_root, seqs))
     main(opt,
          data_root=data_root,
          seqs=seqs,
          exp_name='MOT15_val_all_dla34',
          show_image=False,
-         save_images=False,
-         save_videos=False)
+         save_images=True,
+         save_videos=True)

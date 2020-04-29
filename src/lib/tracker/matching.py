@@ -47,7 +47,7 @@ def linear_assignment(cost_matrix, thresh):
     unmatched_a = np.where(x < 0)[0]
     unmatched_b = np.where(y < 0)[0]
     matches = np.asarray(matches)
-    return matches, unmatched_a, unmatched_b
+    return matches, unmatched_a, unmatched_b        # 匹配对象，未匹配的obj，未匹配的dect
 
 
 def ious(atlbrs, btlbrs):
@@ -98,15 +98,15 @@ def embedding_distance(tracks, detections, metric='cosine'):
     :return: cost_matrix np.ndarray
     """
 
-    cost_matrix = np.zeros((len(tracks), len(detections)), dtype=np.float)
+    cost_matrix = np.zeros((len(tracks), len(detections)), dtype=np.float)      # 总是一个矩阵的形式
     if cost_matrix.size == 0:
         return cost_matrix
-    det_features = np.asarray([track.curr_feat for track in detections], dtype=np.float)
+    det_features = np.asarray([track.curr_feat for track in detections], dtype=np.float)            # 当前帧中的feature
     #for i, track in enumerate(tracks):
         #cost_matrix[i, :] = np.maximum(0.0, cdist(track.smooth_feat.reshape(1,-1), det_features, metric))
     track_features = np.asarray([track.smooth_feat for track in tracks], dtype=np.float)
     cost_matrix = np.maximum(0.0, cdist(track_features, det_features, metric))  # Nomalized features
-    return cost_matrix
+    return cost_matrix              # cdist 计算track_features和det_features中任意对样本之间的距离
 
 
 def gate_cost_matrix(kf, cost_matrix, tracks, detections, only_position=False):
@@ -123,14 +123,24 @@ def gate_cost_matrix(kf, cost_matrix, tracks, detections, only_position=False):
 
 
 def fuse_motion(kf, cost_matrix, tracks, detections, only_position=False, lambda_=0.98):
+    """
+
+    @param kf:
+    @param cost_matrix:
+    @param tracks:
+    @param detections:
+    @param only_position:
+    @param lambda_:
+    @return:
+    """
     if cost_matrix.size == 0:
         return cost_matrix
     gating_dim = 2 if only_position else 4
-    gating_threshold = kalman_filter.chi2inv95[gating_dim]
+    gating_threshold = kalman_filter.chi2inv95[gating_dim]              # 门维度 == 4，返回一个门阈值
     measurements = np.asarray([det.to_xyah() for det in detections])
-    for row, track in enumerate(tracks):
+    for row, track in enumerate(tracks):  # 每一个track，与全部的detections计算gating_distance，返回对象的长度与detections的长度相同
         gating_distance = kf.gating_distance(
             track.mean, track.covariance, measurements, only_position, metric='maha')
-        cost_matrix[row, gating_distance > gating_threshold] = np.inf
-        cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * gating_distance
+        cost_matrix[row, gating_distance > gating_threshold] = np.inf                       # 门距离 > 门阈值，设置为np.inf
+        cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * gating_distance     # 指数移动加权平均
     return cost_matrix

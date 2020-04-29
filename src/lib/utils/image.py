@@ -21,7 +21,7 @@ def transform_preds(coords, center, scale, output_size):
     trans = get_affine_transform(center, scale, 0, output_size, inv=1)
     for p in range(coords.shape[0]):
         target_coords[p, 0:2] = affine_transform(coords[p, 0:2], trans)
-    return target_coords
+    return target_coords            # (128, 2)
 
 
 def get_affine_transform(center,

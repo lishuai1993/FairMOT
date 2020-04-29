@@ -40,15 +40,15 @@ class STrack(BaseTrack):
         self.features = deque([], maxlen=buffer_size)
         self.alpha = 0.9
 
-    def update_features(self, feat):
+    def update_features(self, feat):                # 增加新的feature，添加到self.feature、self.curr_feat
         feat /= np.linalg.norm(feat)
         self.curr_feat = feat
         if self.smooth_feat is None:
             self.smooth_feat = feat
         else:
-            self.smooth_feat = self.alpha * self.smooth_feat + (1 - self.alpha) * feat
+            self.smooth_feat = self.alpha * self.smooth_feat + (1 - self.alpha) * feat  # 指数移动加权平均，self.smooth_feat综合了过去一定量的feature
         self.features.append(feat)
-        self.smooth_feat /= np.linalg.norm(self.smooth_feat)
+        self.smooth_feat /= np.linalg.norm(self.smooth_feat)            # 归一化处理
 
     def predict(self):
         mean_state = self.mean.copy()
@@ -69,19 +69,19 @@ class STrack(BaseTrack):
                 stracks[i].mean = mean
                 stracks[i].covariance = cov
 
-    def activate(self, kalman_filter, frame_id):
+    def activate(self, kalman_filter, frame_id):            # 创建一个新的 track
         """Start a new tracklet"""
         self.kalman_filter = kalman_filter
         self.track_id = self.next_id()
         self.mean, self.covariance = self.kalman_filter.initiate(self.tlwh_to_xyah(self._tlwh))
-
+                                                            # 使用当前位置状态进行初始化
         self.tracklet_len = 0
         self.state = TrackState.Tracked
         #self.is_activated = True
         self.frame_id = frame_id
         self.start_frame = frame_id
 
-    def re_activate(self, new_track, frame_id, new_id=False):
+    def re_activate(self, new_track, frame_id, new_id=False):       # 新创建一个 track
         self.mean, self.covariance = self.kalman_filter.update(
             self.mean, self.covariance, self.tlwh_to_xyah(new_track.tlwh)
         )
@@ -102,11 +102,11 @@ class STrack(BaseTrack):
         :type update_feature: bool
         :return:
         """
-        self.frame_id = frame_id
-        self.tracklet_len += 1
+        self.frame_id = frame_id        # 当前的帧id
+        self.tracklet_len += 1          # 追踪片段长度增加 1
 
         new_tlwh = new_track.tlwh
-        self.mean, self.covariance = self.kalman_filter.update(
+        self.mean, self.covariance = self.kalman_filter.update(         # 卡尔曼滤波器的
             self.mean, self.covariance, self.tlwh_to_xyah(new_tlwh))
         self.state = TrackState.Tracked
         self.is_activated = True
@@ -170,7 +170,7 @@ class STrack(BaseTrack):
         return 'OT_{}_({}-{})'.format(self.track_id, self.start_frame, self.end_frame)
 
 
-class JDETracker(object):
+class JDETracker(object):           # 是一个多目标tracker，保存了很多个track轨迹
     def __init__(self, opt, frame_rate=30):
         self.opt = opt
         if opt.gpus[0] >= 0:
@@ -178,25 +178,25 @@ class JDETracker(object):
         else:
             opt.device = torch.device('cpu')
         print('Creating model...')
-        self.model = create_model(opt.arch, opt.heads, opt.head_conv)
+        self.model = create_model(opt.arch, opt.heads, opt.head_conv)           # 加载模型，
         self.model = load_model(self.model, opt.load_model)
         self.model = self.model.to(opt.device)
         self.model.eval()
 
-        self.tracked_stracks = []  # type: list[STrack]
-        self.lost_stracks = []  # type: list[STrack]
-        self.removed_stracks = []  # type: list[STrack]
+        self.tracked_stracks = []  # type: list[STrack]         # 保存一系列追踪中的轨迹
+        self.lost_stracks = []  # type: list[STrack]            # 保存已经丢失的轨迹
+        self.removed_stracks = []  # type: list[STrack]         # 保存已经移除的轨迹
 
         self.frame_id = 0
-        self.det_thresh = opt.conf_thres
+        self.det_thresh = opt.conf_thres                        # 检测框阈值
         self.buffer_size = int(frame_rate / 30.0 * opt.track_buffer)
-        self.max_time_lost = self.buffer_size
+        self.max_time_lost = self.buffer_size                   # 最大连续self.buffer_size次没有匹配到目标时，表示该轨迹丢失
         self.max_per_image = 128
         self.mean = np.array(opt.mean, dtype=np.float32).reshape(1, 1, 3)
         self.std = np.array(opt.std, dtype=np.float32).reshape(1, 1, 3)
 
-        self.kalman_filter = KalmanFilter()
-
+        self.kalman_filter = KalmanFilter()         # 预测，根据上一帧目标的检测位置和速度，预测当前帧目标的检测位置和速度
+                                                    # 更新，得到目前系统的预测状态
     def post_process(self, dets, meta):
         dets = dets.detach().cpu().numpy()
         dets = dets.reshape(1, -1, dets.shape[2])
@@ -205,7 +205,7 @@ class JDETracker(object):
             meta['out_height'], meta['out_width'], self.opt.num_classes)
         for j in range(1, self.opt.num_classes + 1):
             dets[0][j] = np.array(dets[0][j], dtype=np.float32).reshape(-1, 5)
-        return dets[0]
+        return dets[0]          # dets ::= list, dets[0] ::= dict, key值是1，value维度为128*5
 
     def merge_outputs(self, detections):
         results = {}
@@ -223,17 +223,18 @@ class JDETracker(object):
                 results[j] = results[j][keep_inds]
         return results
 
-    def update(self, im_blob, img0):
+    def update(self, im_blob, img0):        # 处理当前帧中的检测框
         self.frame_id += 1
         activated_starcks = []
-        refind_stracks = []
-        lost_stracks = []
-        removed_stracks = []
+        refind_stracks = []                 # 从上一帧到当前帧，新发现的track
+        lost_stracks = []                   # 从上一帧到当前帧，丢失的stack
+        removed_stracks = []                # 从上一帧到当前帧，需要被移除的stack
 
         width = img0.shape[1]
         height = img0.shape[0]
         inp_height = im_blob.shape[2]
         inp_width = im_blob.shape[3]
+
         c = np.array([width / 2., height / 2.], dtype=np.float32)
         s = max(float(inp_width) / float(inp_height) * height, width) * 1.0
         meta = {'c': c, 's': s,
@@ -246,11 +247,12 @@ class JDETracker(object):
             hm = output['hm'].sigmoid_()
             wh = output['wh']
             id_feature = output['id']
-            id_feature = F.normalize(id_feature, dim=1)
-
+            id_feature = F.normalize(id_feature, dim=1)             # torch.Size([1, 512, 152, 272])
             reg = output['reg'] if self.opt.reg_offset else None
-            dets, inds = mot_decode(hm, wh, reg=reg, cat_spec_wh=self.opt.cat_spec_wh, K=self.opt.K)
-            id_feature = _tranpose_and_gather_feat(id_feature, inds)
+
+            dets, inds = mot_decode(hm, wh, reg=reg, cat_spec_wh=self.opt.cat_spec_wh, K=self.opt.K)    # 预测框左上角、右下角的坐标表示、得分、分类，inds还不清楚物理意义
+            # inds 是在图像转换成一维情况下，置信度得分最大的128个值，表示最大输出目标的数量
+            id_feature = _tranpose_and_gather_feat(id_feature, inds)        # id_feature torch.Size([1, 512, 152, 272]), inds torch.Size([1, 128])
             id_feature = id_feature.squeeze(0)
             id_feature = id_feature.cpu().numpy()
 
@@ -258,8 +260,8 @@ class JDETracker(object):
         dets = self.merge_outputs([dets])[1]
 
         remain_inds = dets[:, 4] > self.opt.conf_thres
-        dets = dets[remain_inds]
-        id_feature = id_feature[remain_inds]
+        dets = dets[remain_inds]                    # (2, 5)
+        id_feature = id_feature[remain_inds]        # (2, 512)
 
         # vis
         '''
@@ -294,8 +296,8 @@ class JDETracker(object):
         # Predict the current location with KF
         #for strack in strack_pool:
             #strack.predict()
-        STrack.multi_predict(strack_pool)
-        dists = matching.embedding_distance(strack_pool, detections)
+        STrack.multi_predict(strack_pool)                               # 使用卡尔曼滤波预测下一帧中目标的状态，调用每一个track的predict方法进行预测
+        dists = matching.embedding_distance(strack_pool, detections)    # 使用embedding进行匹配，返回度量矩阵
         #dists = matching.gate_cost_matrix(self.kalman_filter, dists, strack_pool, detections)
         dists = matching.fuse_motion(self.kalman_filter, dists, strack_pool, detections)
         matches, u_track, u_detection = matching.linear_assignment(dists, thresh=0.7)
@@ -303,14 +305,14 @@ class JDETracker(object):
         for itracked, idet in matches:
             track = strack_pool[itracked]
             det = detections[idet]
-            if track.state == TrackState.Tracked:
+            if track.state == TrackState.Tracked:               # 上一帧是被追踪状态
                 track.update(detections[idet], self.frame_id)
                 activated_starcks.append(track)
-            else:
+            else:                                               # 上一帧是new状态
                 track.re_activate(det, self.frame_id, new_id=False)
                 refind_stracks.append(track)
 
-        ''' Step 3: Second association, with IOU'''
+        ''' Step 3: Second association, with IOU'''             # 第二次，尝试将未匹配到的detection和未匹配到的track匹配起来
         detections = [detections[i] for i in u_detection]
         r_tracked_stracks = [strack_pool[i] for i in u_track if strack_pool[i].state == TrackState.Tracked]
         dists = matching.iou_distance(r_tracked_stracks, detections)
@@ -328,7 +330,7 @@ class JDETracker(object):
 
         for it in u_track:
             track = r_tracked_stracks[it]
-            if not track.state == TrackState.Lost:
+            if not track.state == TrackState.Lost:      # 判断track是否
                 track.mark_lost()
                 lost_stracks.append(track)
 
@@ -336,9 +338,11 @@ class JDETracker(object):
         detections = [detections[i] for i in u_detection]
         dists = matching.iou_distance(unconfirmed, detections)
         matches, u_unconfirmed, u_detection = matching.linear_assignment(dists, thresh=0.7)
+
         for itracked, idet in matches:
             unconfirmed[itracked].update(detections[idet], self.frame_id)
             activated_starcks.append(unconfirmed[itracked])
+
         for it in u_unconfirmed:
             track = unconfirmed[it]
             track.mark_removed()
@@ -351,10 +355,11 @@ class JDETracker(object):
                 continue
             track.activate(self.kalman_filter, self.frame_id)
             activated_starcks.append(track)
+
         """ Step 5: Update state"""
         for track in self.lost_stracks:
             if self.frame_id - track.end_frame > self.max_time_lost:
-                track.mark_removed()
+                track.mark_removed()                                    # 移除达到条件的track
                 removed_stracks.append(track)
 
         # print('Ramained match {} s'.format(t4-t3))

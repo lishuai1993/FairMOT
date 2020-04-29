@@ -2,13 +2,13 @@ import numpy as np
 from collections import OrderedDict
 
 
-class TrackState(object):
-    New = 0
-    Tracked = 1
-    Lost = 2
-    Removed = 3
+class TrackState(object):           # 轨迹的四种状态
+    New = 0                         # 创建新的轨迹
+    Tracked = 1                     # 追踪状态
+    Lost = 2                        # 丢失
+    Removed = 3                     # 轨迹完成了，将其从当前帧中删除
 
-
+# 存储一条轨迹信息的基本单元
 class BaseTrack(object):
     _count = 0
 
@@ -16,13 +16,13 @@ class BaseTrack(object):
     is_activated = False
     state = TrackState.New
 
-    history = OrderedDict()
-    features = []
+    history = OrderedDict()         # 有序的
+    features = []                   # 存储该轨迹在不同帧对应位置通过ReID提取到的特征
     curr_feature = None
     score = 0
     start_frame = 0
     frame_id = 0
-    time_since_update = 0
+    time_since_update = 0           # 每次轨迹调用predict函数的时候就会+1
 
     # multi-camera
     location = (np.inf, np.inf)

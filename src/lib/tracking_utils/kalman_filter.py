@@ -13,7 +13,7 @@ chi2inv95 = {
     1: 3.8415,
     2: 5.9915,
     3: 7.8147,
-    4: 9.4877,
+    4: 9.4877,         # 卡方分布，在不同自由度下，0.95分位条件下的阈值
     5: 11.070,
     6: 12.592,
     7: 14.067,
@@ -50,8 +50,8 @@ class KalmanFilter(object):
         # Motion and observation uncertainty are chosen relative to the current
         # state estimate. These weights control the amount of uncertainty in
         # the model. This is a bit hacky.
-        self._std_weight_position = 1. / 20
-        self._std_weight_velocity = 1. / 160
+        self._std_weight_position = 1. / 20         # 初始化位置误差
+        self._std_weight_velocity = 1. / 160        # 初始化速度误差
 
     def initiate(self, measurement):
         """Create track from unassociated measurement.
@@ -72,7 +72,7 @@ class KalmanFilter(object):
         """
         mean_pos = measurement
         mean_vel = np.zeros_like(mean_pos)
-        mean = np.r_[mean_pos, mean_vel]
+        mean = np.r_[mean_pos, mean_vel]            # 初始时，没有速度，其均值mean被设置为 0
 
         std = [
             2 * self._std_weight_position * measurement[3],
@@ -82,8 +82,8 @@ class KalmanFilter(object):
             10 * self._std_weight_velocity * measurement[3],
             10 * self._std_weight_velocity * measurement[3],
             1e-5,
-            10 * self._std_weight_velocity * measurement[3]]
-        covariance = np.diag(np.square(std))
+            10 * self._std_weight_velocity * measurement[3]]        # 确定每一个变量的方差
+        covariance = np.diag(np.square(std))                        # 计算协方差
         return mean, covariance
 
     def predict(self, mean, covariance):
@@ -146,8 +146,8 @@ class KalmanFilter(object):
             self._std_weight_position * mean[3],
             1e-1,
             self._std_weight_position * mean[3]]
-        innovation_cov = np.diag(np.square(std))
-
+        innovation_cov = np.diag(np.square(std))                # 初始化噪声矩阵
+        # 将均值向量、协方差矩阵映射到检测空间
         mean = np.dot(self._update_mat, mean)
         covariance = np.linalg.multi_dot((
             self._update_mat, covariance, self._update_mat.T))
@@ -213,22 +213,22 @@ class KalmanFilter(object):
 
         """
         projected_mean, projected_cov = self.project(mean, covariance)
-
+        # 矩阵分解
         chol_factor, lower = scipy.linalg.cho_factor(
             projected_cov, lower=True, check_finite=False)
-        kalman_gain = scipy.linalg.cho_solve(
+        kalman_gain = scipy.linalg.cho_solve(                           # 计算卡尔曼增益
             (chol_factor, lower), np.dot(covariance, self._update_mat.T).T,
             check_finite=False).T
-        innovation = measurement - projected_mean
+        innovation = measurement - projected_mean                       # z -Hx'
 
-        new_mean = mean + np.dot(innovation, kalman_gain.T)
-        new_covariance = covariance - np.linalg.multi_dot((
+        new_mean = mean + np.dot(innovation, kalman_gain.T)             # x = x' +Ky    更新后的均值向量
+        new_covariance = covariance - np.linalg.multi_dot((             # P = (I - KH)P'        更新后的协方差矩阵
             kalman_gain, projected_cov, kalman_gain.T))
         return new_mean, new_covariance
 
     def gating_distance(self, mean, covariance, measurements,
                         only_position=False, metric='maha'):
-        """Compute gating distance between state distribution and measurements.
+        """Compute gating distance between state distribution and measurements.  measurements就是detection，state distribution是估计状态
         A suitable distance threshold can be obtained from `chi2inv95`. If
         `only_position` is False, the chi-square distribution has 4 degrees of
         freedom, otherwise 2.

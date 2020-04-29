@@ -8,7 +8,7 @@ import torch.nn as nn
 import os
 
 from .networks.dlav0 import get_pose_net as get_dlav0
-from .networks.pose_dla_dcn import get_pose_net as get_dla_dcn
+from .networks.pose_dla_dcn import get_pose_net as get_dla_dcn              # 目前训练采用的
 from .networks.resnet_dcn import get_pose_net as get_pose_net_dcn
 from .networks.resnet_fpn_dcn import get_pose_net as get_pose_net_fpn_dcn
 from .networks.pose_hrnet import get_pose_net as get_pose_net_hrnet
@@ -24,6 +24,7 @@ _model_factory = {
 def create_model(arch, heads, head_conv):
   num_layers = int(arch[arch.find('_') + 1:]) if '_' in arch else 0
   arch = arch[:arch.find('_')] if '_' in arch else arch
+
   get_model = _model_factory[arch]
   model = get_model(num_layers=num_layers, heads=heads, head_conv=head_conv)
   return model

@@ -469,20 +469,20 @@ class DLASeg(nn.Module):
 
     def forward(self, x):
         x = self.base(x)
-        x = self.dla_up(x)
+        x = self.dla_up(x)                                  # 上采样
 
         y = []
         for i in range(self.last_level - self.first_level):
             y.append(x[i].clone())
         self.ida_up(y, 0, len(y))
 
-        z = {}
+        z = {}                                              # 四个结果，分别是hm、wh、id、reg_offset
         for head in self.heads:
             z[head] = self.__getattr__(head)(y[-1])
-        return [z]
+        return [z]                                          # list包含了一个字典
     
 
-def get_pose_net(num_layers, heads, head_conv=256, down_ratio=4):
+def get_pose_net(num_layers, heads, head_conv=256, down_ratio=4):               # 创建dla34，3个检测head，1个id embedding head
   model = DLASeg('dla{}'.format(num_layers), heads,
                  pretrained=True,
                  down_ratio=down_ratio,

@@ -71,7 +71,7 @@ class LoadImages:  # for inference
         # Padded resize
         img, _, _, _ = letterbox(img0, height=self.height, width=self.width)
 
-        # Normalize RGB
+        # Normalize RGB, cv2.imread 读取的图像通道为BGR
         img = img[:, :, ::-1].transpose(2, 0, 1)
         img = np.ascontiguousarray(img, dtype=np.float32)
         img /= 255.0

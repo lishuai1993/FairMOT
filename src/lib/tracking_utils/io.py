@@ -33,7 +33,7 @@ def write_results(filename, results_dict: Dict, data_type: str):
     logger.info('Save results to {}'.format(filename))
 
 
-def read_results(filename, data_type: str, is_gt=False, is_ignore=False):
+def read_results(filename, data_type: str, is_gt=False, is_ignore=False):   #
     if data_type in ('mot', 'lab'):
         read_fun = read_mot_results
     else:
@@ -60,7 +60,7 @@ labels={'ped', ...			% 1
 """
 
 
-def read_mot_results(filename, is_gt, is_ignore):
+def read_mot_results(filename, is_gt, is_ignore):           #
     valid_labels = {1}
     ignore_labels = {2, 7, 8, 12}
     results_dict = dict()
@@ -92,19 +92,19 @@ def read_mot_results(filename, is_gt, is_ignore):
                         continue
                     score = 1
                 else:
-                    score = float(linelist[6])
+                    score = float(linelist[6])                  # conf
 
                 tlwh = tuple(map(float, linelist[2:6]))
                 target_id = int(linelist[1])
 
                 results_dict[fid].append((tlwh, target_id, score))
 
-    return results_dict
+    return results_dict   # 字典，key值是帧数，value是一个list，其中每一个元素都是一个tuple，tuple包含一个检测框的坐标、目标id、检测框得分
 
 
 def unzip_objs(objs):
     if len(objs) > 0:
-        tlwhs, ids, scores = zip(*objs)
+        tlwhs, ids, scores = zip(*objs)             # zip配合解包运算*，还有这种巧妙地用法
     else:
         tlwhs, ids, scores = [], [], []
     tlwhs = np.asarray(tlwhs, dtype=float).reshape(-1, 4)

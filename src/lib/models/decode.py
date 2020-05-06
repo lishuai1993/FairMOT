@@ -50,6 +50,8 @@ def _topk(scores, K=40):
 def mot_decode(heat, wh, reg=None, cat_spec_wh=False, K=100):
     """
     wh ::= 预测的宽和高
+
+    @return     ::=
     """
     batch, cat, height, width = heat.size()
 
@@ -82,4 +84,4 @@ def mot_decode(heat, wh, reg=None, cat_spec_wh=False, K=100):
                         ys + wh[..., 1:2] / 2], dim=2)          # 预测的左上角、右下角的坐标表示
     detections = torch.cat([bboxes, scores, clses], dim=2)
 
-    return detections, inds                     # inds 尚不清楚代表的物理意义
+    return detections, inds                                     # inds 尚不清楚代表的物理意义

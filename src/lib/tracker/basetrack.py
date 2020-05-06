@@ -28,7 +28,7 @@ class BaseTrack(object):
     location = (np.inf, np.inf)
 
     @property
-    def end_frame(self):
+    def end_frame(self):            # 返回当前帧的id
         return self.frame_id
 
     @staticmethod

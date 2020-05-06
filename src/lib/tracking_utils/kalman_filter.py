@@ -153,7 +153,7 @@ class KalmanFilter(object):
             self._update_mat, covariance, self._update_mat.T))
         return mean, covariance + innovation_cov
 
-    def multi_predict(self, mean, covariance):
+    def multi_predict(self, mean, covariance):                  # 预测过程，后面需要具体看
         """Run Kalman filter prediction step (Vectorized version).
         Parameters
         ----------
@@ -226,8 +226,8 @@ class KalmanFilter(object):
             kalman_gain, projected_cov, kalman_gain.T))
         return new_mean, new_covariance
 
-    def gating_distance(self, mean, covariance, measurements,
-                        only_position=False, metric='maha'):
+    def gating_distance(self, mean: object, covariance: object, measurements: object,
+                        only_position: object = False, metric: object = 'maha') -> object:
         """Compute gating distance between state distribution and measurements.  measurements就是detection，state distribution是估计状态
         A suitable distance threshold can be obtained from `chi2inv95`. If
         `only_position` is False, the chi-square distribution has 4 degrees of

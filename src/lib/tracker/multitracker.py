@@ -23,7 +23,7 @@ from models.utils import _tranpose_and_gather_feat
 
 
 class STrack(BaseTrack):
-    shared_kalman = KalmanFilter()
+    shared_kalman = KalmanFilter()                                  # 类变量
     def __init__(self, tlwh, score, temp_feat, buffer_size=30):
 
         # wait activate
@@ -64,8 +64,8 @@ class STrack(BaseTrack):
             for i, st in enumerate(stracks):
                 if st.state != TrackState.Tracked:
                     multi_mean[i][7] = 0
-            multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(multi_mean, multi_covariance)
-            for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):
+            multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(multi_mean, multi_covariance) # 返回预测状态的均值向量和协方差矩阵
+            for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):         # 然后再将各自的均值向量、协方差矩阵分别分配给对应的stracks
                 stracks[i].mean = mean
                 stracks[i].covariance = cov
 
@@ -94,7 +94,7 @@ class STrack(BaseTrack):
         if new_id:
             self.track_id = self.next_id()
 
-    def update(self, new_track, frame_id, update_feature=True):
+    def update(self, new_track, frame_id, update_feature=True):         # 更新对应的 KF 中的均值向量、协方差矩阵
         """
         Update a matched track
         :type new_track: STrack
@@ -197,7 +197,7 @@ class JDETracker(object):           # 是一个多目标tracker，保存了很�
 
         self.kalman_filter = KalmanFilter()         # 预测，根据上一帧目标的检测位置和速度，预测当前帧目标的检测位置和速度
                                                     # 更新，得到目前系统的预测状态
-    def post_process(self, dets, meta):
+    def post_process(self, dets, meta):             # 是将在feature上的预测结果，映射到原始图像中，给出在原始图像中128个检测框的坐标、及相应置信度
         dets = dets.detach().cpu().numpy()
         dets = dets.reshape(1, -1, dets.shape[2])
         dets = ctdet_post_process(
@@ -250,18 +250,18 @@ class JDETracker(object):           # 是一个多目标tracker，保存了很�
             id_feature = F.normalize(id_feature, dim=1)             # torch.Size([1, 512, 152, 272])
             reg = output['reg'] if self.opt.reg_offset else None
 
-            dets, inds = mot_decode(hm, wh, reg=reg, cat_spec_wh=self.opt.cat_spec_wh, K=self.opt.K)    # 预测框左上角、右下角的坐标表示、得分、分类，inds还不清楚物理意义
+            dets, inds = mot_decode(hm, wh, reg=reg, cat_spec_wh=self.opt.cat_spec_wh, K=self.opt.K)    # 预测框左上角、右下角的坐标表示、得分、分类，inds是图像在一维情况下的索引
             # inds 是在图像转换成一维情况下，置信度得分最大的128个值，表示最大输出目标的数量
             id_feature = _tranpose_and_gather_feat(id_feature, inds)        # id_feature torch.Size([1, 512, 152, 272]), inds torch.Size([1, 128])
-            id_feature = id_feature.squeeze(0)
+            id_feature = id_feature.squeeze(0)                              # torch.Size([1, 128, 512])
             id_feature = id_feature.cpu().numpy()
 
-        dets = self.post_process(dets, meta)
-        dets = self.merge_outputs([dets])[1]
+        dets = self.post_process(dets, meta)                                # 是将在feature上的预测结果，映射到原始图像中，给出在原始图像中128个检测框的坐标、及相应置信度
+        dets = self.merge_outputs([dets])[1]                    # (128, 5)
 
-        remain_inds = dets[:, 4] > self.opt.conf_thres
-        dets = dets[remain_inds]                    # (2, 5)
-        id_feature = id_feature[remain_inds]        # (2, 512)
+        remain_inds = dets[:, 4] > self.opt.conf_thres                      # 仅保留置信度得分 大于 设置阈值的检测框
+        dets = dets[remain_inds]                    # (2, 5)，只剩下两个检测框作为最终的结果
+        id_feature = id_feature[remain_inds]        # (2, 512)，对应的feature
 
         # vis
         '''
@@ -277,36 +277,36 @@ class JDETracker(object):           # 是一个多目标tracker，保存了很�
 
         if len(dets) > 0:
             '''Detections'''
-            detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30) for
-                          (tlbrs, f) in zip(dets[:, :5], id_feature)]
+            detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30) for               # 直接调用类的方法进行计算，有什么特别的么？
+                          (tlbrs, f) in zip(dets[:, :5], id_feature)]                               # 创建strack，这里相当于tracklets
         else:
             detections = []
 
         ''' Add newly detected tracklets to tracked_stracks'''
         unconfirmed = []
         tracked_stracks = []  # type: list[STrack]
-        for track in self.tracked_stracks:
+        for track in self.tracked_stracks:                      # 将当前帧之前存在的track，划分为unconfirmed、track_stracks两种类型
             if not track.is_activated:
                 unconfirmed.append(track)
             else:
                 tracked_stracks.append(track)
 
         ''' Step 2: First association, with embedding'''
-        strack_pool = joint_stracks(tracked_stracks, self.lost_stracks)
+        strack_pool = joint_stracks(tracked_stracks, self.lost_stracks)     # 取并集
         # Predict the current location with KF
         #for strack in strack_pool:
             #strack.predict()
         STrack.multi_predict(strack_pool)                               # 使用卡尔曼滤波预测下一帧中目标的状态，调用每一个track的predict方法进行预测
-        dists = matching.embedding_distance(strack_pool, detections)    # 使用embedding进行匹配，返回度量矩阵
+        dists = matching.embedding_distance(strack_pool, detections)            # 使用embedding进行匹配，返回匹配矩阵，将detection与KF预测位置的feature进行匹配，进而将detection与strack进行配对
         #dists = matching.gate_cost_matrix(self.kalman_filter, dists, strack_pool, detections)
-        dists = matching.fuse_motion(self.kalman_filter, dists, strack_pool, detections)
-        matches, u_track, u_detection = matching.linear_assignment(dists, thresh=0.7)
+        dists = matching.fuse_motion(self.kalman_filter, dists, strack_pool, detections)    # 对每一个track，计算其与当前帧中每一个detection的门距离
+        matches, u_track, u_detection = matching.linear_assignment(dists, thresh=0.7)       # 根据门距离，使用匈牙利算法最大匹配，确定三种匹配结果
 
         for itracked, idet in matches:
             track = strack_pool[itracked]
             det = detections[idet]
             if track.state == TrackState.Tracked:               # 上一帧是被追踪状态
-                track.update(detections[idet], self.frame_id)
+                track.update(detections[idet], self.frame_id)                               # track状态更新，其中 KF 的均值向量、协方差矩阵进行更新
                 activated_starcks.append(track)
             else:                                               # 上一帧是new状态
                 track.re_activate(det, self.frame_id, new_id=False)
@@ -334,7 +334,7 @@ class JDETracker(object):           # 是一个多目标tracker，保存了很�
                 track.mark_lost()
                 lost_stracks.append(track)
 
-        '''Deal with unconfirmed tracks, usually tracks with only one beginning frame'''
+        '''Deal with unconfirmed tracks, usually tracks with only one beginning frame 仅追踪到一帧的track为unconfirmed track'''
         detections = [detections[i] for i in u_detection]
         dists = matching.iou_distance(unconfirmed, detections)
         matches, u_unconfirmed, u_detection = matching.linear_assignment(dists, thresh=0.7)
@@ -384,7 +384,7 @@ class JDETracker(object):           # 是一个多目标tracker，保存了很�
         return output_stracks
 
 
-def joint_stracks(tlista, tlistb):
+def joint_stracks(tlista, tlistb):              # 将两个track_list，根据id进行合并，
     exists = {}
     res = []
     for t in tlista:
@@ -392,7 +392,7 @@ def joint_stracks(tlista, tlistb):
         res.append(t)
     for t in tlistb:
         tid = t.track_id
-        if not exists.get(tid, 0):
+        if not exists.get(tid, 0):              # 如果tlistb中的track的id在tlista中没有对应的id，则将该track添加到res中
             exists[tid] = 1
             res.append(t)
     return res

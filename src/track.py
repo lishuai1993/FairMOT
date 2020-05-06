@@ -236,11 +236,17 @@ if __name__ == '__main__':
         data_root = os.path.join(opt.data_dir, 'MOT20/images/test')
     seqs = [seq.strip() for seq in seqs_str.split()]
 
+    # data_root = '/home/shuai.li/dset/MOT/cue_video/val'
+    # seqs = ['door']
+
     print("data_root is:\t{0}\nseq is:\t{1}".format(data_root, seqs))
     main(opt,
          data_root=data_root,
          seqs=seqs,
-         exp_name='MOT15_val_all_dla34',
+         exp_name='cue_door',
          show_image=False,
          save_images=True,
          save_videos=True)
+
+
+

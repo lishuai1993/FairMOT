@@ -106,7 +106,7 @@ class STrack(BaseTrack):
         self.tracklet_len += 1          # 追踪片段长度增加 1
 
         new_tlwh = new_track.tlwh
-        self.mean, self.covariance = self.kalman_filter.update(         # 卡尔曼滤波器的
+        self.mean, self.covariance = self.kalman_filter.update(         # 卡尔曼滤波器
             self.mean, self.covariance, self.tlwh_to_xyah(new_tlwh))
         self.state = TrackState.Tracked
         self.is_activated = True
@@ -171,7 +171,7 @@ class STrack(BaseTrack):
 
 
 class JDETracker(object):           # 是一个多目标tracker，保存了很多个track轨迹
-    def __init__(self, opt, frame_rate=30):
+    def __init__(self, opt, frame_rate=30):             # 帧率的意义
         self.opt = opt
         if opt.gpus[0] >= 0:
             opt.device = torch.device('cuda')
@@ -188,8 +188,8 @@ class JDETracker(object):           # 是一个多目标tracker，保存了很�
         self.removed_stracks = []  # type: list[STrack]         # 保存已经移除的轨迹
 
         self.frame_id = 0
-        self.det_thresh = opt.conf_thres                        # 检测框阈值
-        self.buffer_size = int(frame_rate / 30.0 * opt.track_buffer)
+        self.det_thresh = opt.conf_thres                        # 检测框阈值，这里设置为与tracking的置信度阈值相同
+        self.buffer_size = int(frame_rate / 30.0 * opt.track_buffer)            # 还是等于输入视频的真实帧率
         self.max_time_lost = self.buffer_size                   # 最大连续self.buffer_size次没有匹配到目标时，表示该轨迹丢失
         self.max_per_image = 128
         self.mean = np.array(opt.mean, dtype=np.float32).reshape(1, 1, 3)
@@ -247,7 +247,7 @@ class JDETracker(object):           # 是一个多目标tracker，保存了很�
             hm = output['hm'].sigmoid_()
             wh = output['wh']
             id_feature = output['id']
-            id_feature = F.normalize(id_feature, dim=1)             # torch.Size([1, 512, 152, 272])
+            id_feature = F.normalize(id_feature, dim=1)                 # torch.Size([1, 512, 152, 272])
             reg = output['reg'] if self.opt.reg_offset else None
 
             dets, inds = mot_decode(hm, wh, reg=reg, cat_spec_wh=self.opt.cat_spec_wh, K=self.opt.K)    # 预测框左上角、右下角的坐标表示、得分、分类，inds是图像在一维情况下的索引
@@ -297,7 +297,8 @@ class JDETracker(object):           # 是一个多目标tracker，保存了很�
         #for strack in strack_pool:
             #strack.predict()
         STrack.multi_predict(strack_pool)                               # 使用卡尔曼滤波预测下一帧中目标的状态，调用每一个track的predict方法进行预测
-        dists = matching.embedding_distance(strack_pool, detections)            # 使用embedding进行匹配，返回匹配矩阵，将detection与KF预测位置的feature进行匹配，进而将detection与strack进行配对
+
+        dists = matching.embedding_distance(strack_pool, detections)            # 使用embedding进行匹配，返回匹配矩阵，将detection与当前存在的track的smooth feat计算距离
         #dists = matching.gate_cost_matrix(self.kalman_filter, dists, strack_pool, detections)
         dists = matching.fuse_motion(self.kalman_filter, dists, strack_pool, detections)    # 对每一个track，计算其与当前帧中每一个detection的门距离
         matches, u_track, u_detection = matching.linear_assignment(dists, thresh=0.7)       # 根据门距离，使用匈牙利算法最大匹配，确定三种匹配结果
@@ -306,7 +307,7 @@ class JDETracker(object):           # 是一个多目标tracker，保存了很�
             track = strack_pool[itracked]
             det = detections[idet]
             if track.state == TrackState.Tracked:               # 上一帧是被追踪状态
-                track.update(detections[idet], self.frame_id)                               # track状态更新，其中 KF 的均值向量、协方差矩阵进行更新
+                track.update(detections[idet], self.frame_id)   # track状态更新，其中 KF 的均值向量、协方差矩阵进行更新
                 activated_starcks.append(track)
             else:                                               # 上一帧是new状态
                 track.re_activate(det, self.frame_id, new_id=False)
@@ -334,7 +335,7 @@ class JDETracker(object):           # 是一个多目标tracker，保存了很�
                 track.mark_lost()
                 lost_stracks.append(track)
 
-        '''Deal with unconfirmed tracks, usually tracks with only one beginning frame 仅追踪到一帧的track为unconfirmed track'''
+        '''第三次匹配, Deal with unconfirmed tracks, usually tracks with only one beginning frame 仅追踪到一帧的track为unconfirmed track'''
         detections = [detections[i] for i in u_detection]
         dists = matching.iou_distance(unconfirmed, detections)
         matches, u_unconfirmed, u_detection = matching.linear_assignment(dists, thresh=0.7)
@@ -351,7 +352,7 @@ class JDETracker(object):           # 是一个多目标tracker，保存了很�
         """ Step 4: Init new stracks"""
         for inew in u_detection:
             track = detections[inew]
-            if track.score < self.det_thresh:
+            if track.score < self.det_thresh:                           # 与tracking的置信度阈值相比较
                 continue
             track.activate(self.kalman_filter, self.frame_id)
             activated_starcks.append(track)

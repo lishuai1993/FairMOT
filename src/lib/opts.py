@@ -112,9 +112,9 @@ class opts(object):
     self.parser.add_argument('--nms_thres', type=float, default=0.4, help='iou thresh for nms')
     self.parser.add_argument('--track_buffer', type=int, default=30, help='tracking buffer')
     self.parser.add_argument('--min-box-area', type=float, default=200, help='filter out tiny boxes')
-    self.parser.add_argument('--input-video', type=str, default='../videos/MOT16-03.mp4', help='path to the input video')
+    self.parser.add_argument('--input-video', type=str, default='/home/shuai.li/dset/MOT/cue_video/compare_index_yhw/video/15.mp4', help='path to the input video')
     self.parser.add_argument('--output-format', type=str, default='video', help='video or text')
-    self.parser.add_argument('--output-root', type=str, default='../results', help='expected output root path')
+    self.parser.add_argument('--output-root', type=str, default='/home/shuai.li/dset/MOT/cue_video/compare_index_yhw/result', help='expected output root path')
 
     # mot
     self.parser.add_argument('--data_cfg', type=str,

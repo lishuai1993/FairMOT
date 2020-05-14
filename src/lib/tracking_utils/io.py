@@ -60,7 +60,7 @@ labels={'ped', ...			% 1
 """
 
 
-def read_mot_results(filename, is_gt, is_ignore):           #
+def read_mot_results(filename, is_gt, is_ignore):
     valid_labels = {1}
     ignore_labels = {2, 7, 8, 12}
     results_dict = dict()
@@ -70,19 +70,19 @@ def read_mot_results(filename, is_gt, is_ignore):           #
                 linelist = line.split(',')
                 if len(linelist) < 7:
                     continue
-                fid = int(linelist[0])
+                fid = int(linelist[0])                  # frameid
                 if fid < 1:
                     continue
                 results_dict.setdefault(fid, list())
 
-                if is_gt:
+                if is_gt:               # 遇到MOT16-、MOT17-数据集，使用mask不等于0、并且label满足指定类别的图片
                     if 'MOT16-' in filename or 'MOT17-' in filename:
                         label = int(float(linelist[7]))
                         mark = int(float(linelist[6]))
                         if mark == 0 or label not in valid_labels:
                             continue
                     score = 1
-                elif is_ignore:
+                elif is_ignore:             # 只针对提取MOT16-、MOT17-数据集的groundtruth
                     if 'MOT16-' in filename or 'MOT17-' in filename:
                         label = int(float(linelist[7]))
                         vis_ratio = float(linelist[8])
@@ -90,12 +90,12 @@ def read_mot_results(filename, is_gt, is_ignore):           #
                             continue
                     else:
                         continue
-                    score = 1
+                    score = 1               # 只提取其中ignore_labels的图片，或者vis_ratio<0，不管conf的值
                 else:
-                    score = float(linelist[6])                  # conf
+                    score = float(linelist[6])                  # 使用gt的conf
 
                 tlwh = tuple(map(float, linelist[2:6]))
-                target_id = int(linelist[1])
+                target_id = int(linelist[1])                    # 框的目标id
 
                 results_dict[fid].append((tlwh, target_id, score))
 

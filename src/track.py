@@ -57,7 +57,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
     # 原始图像padding、resize，对每一个eval文件夹分别生成一个dataloader，
     for path, img, img0 in dataloader:       # 图像path， RGB格式并转换为(c, h, w)维度，cv2.imread的图像，BGR(h, w, c)
         if frame_id % 100 == 0:
-            logger.info('Processing frame {} ({:.2f} fps)'.format(frame_id, 1. / max(1e-5, timer.average_time)))
+            logger.info('Processing frame {} ({:.2f} fps)'.format(frame_id, 1. / max(1e-5, timer.average_time)))        # 是抽象出来的帧率，与视频的帧率意义不同，表示能在1秒内处理的图像的数量
 
         # run tracking
         timer.tic()
@@ -145,6 +145,11 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
 
 
 if __name__ == '__main__':
+    """
+    python track.py mot --load_model ../models/all_dla34.pth --conf_thres 0.6
+    """
+
+
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     opt = opts().init()
 
@@ -236,14 +241,14 @@ if __name__ == '__main__':
         data_root = os.path.join(opt.data_dir, 'MOT20/images/test')
     seqs = [seq.strip() for seq in seqs_str.split()]
 
-    # data_root = '/home/shuai.li/dset/MOT/cue_video/val'
-    # seqs = ['door']
+    data_root = '/home/shuai.li/dset/MOT/cue_video/compare_index_yhw'
+    seqs = ['video']
 
     print("data_root is:\t{0}\nseq is:\t{1}".format(data_root, seqs))
     main(opt,
          data_root=data_root,
          seqs=seqs,
-         exp_name='cue_door',
+         exp_name='project_compare',
          show_image=False,
          save_images=True,
          save_videos=True)

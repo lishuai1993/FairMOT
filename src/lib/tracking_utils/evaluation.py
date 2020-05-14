@@ -17,7 +17,7 @@ class Evaluator(object):
         self.load_annotations()
         self.reset_accumulator()
 
-    def load_annotations(self):
+    def load_annotations(self):                     # 读取了两种数据，第二种方式忽略了一部分行人框
         assert self.data_type == 'mot'
 
         gt_filename = os.path.join(self.data_root, self.seq_name, 'gt', 'gt.txt')

@@ -98,14 +98,15 @@ def embedding_distance(tracks, detections, metric='cosine'):
     :return: cost_matrix np.ndarray
     """
 
-    cost_matrix = np.zeros((len(tracks), len(detections)), dtype=np.float)      # 总是一个矩阵的形式
+    cost_matrix = np.zeros((len(tracks), len(detections)), dtype=np.float)                          # 总是一个矩阵的形式
     if cost_matrix.size == 0:
         return cost_matrix
     det_features = np.asarray([track.curr_feat for track in detections], dtype=np.float)            # 当前帧中的feature
     #for i, track in enumerate(tracks):
         #cost_matrix[i, :] = np.maximum(0.0, cdist(track.smooth_feat.reshape(1,-1), det_features, metric))
-    track_features = np.asarray([track.smooth_feat for track in tracks], dtype=np.float)
-    cost_matrix = np.maximum(0.0, cdist(track_features, det_features, metric))  # Nomalized features
+    track_features = np.asarray([track.smooth_feat for track in tracks], dtype=np.float)            # 使用指数移动加权平均的feat，作为track的表示，与detection进行计算
+
+    cost_matrix = np.maximum(0.0, cdist(track_features, det_features, metric))                      # cdist才是计算过程，Nomalized features
     return cost_matrix              # cdist 计算track_features和det_features中任意对样本之间的距离
 
 
@@ -124,7 +125,7 @@ def gate_cost_matrix(kf, cost_matrix, tracks, detections, only_position=False):
 
 def fuse_motion(kf, cost_matrix, tracks, detections, only_position=False, lambda_=0.98):
     """
-
+    这里是计算 检测框与track的预测位置 两者之间的马氏距离(衡量一个点与一个分布之间的距离)
     @param kf:
     @param cost_matrix:
     @param tracks:
@@ -138,7 +139,7 @@ def fuse_motion(kf, cost_matrix, tracks, detections, only_position=False, lambda
     gating_dim = 2 if only_position else 4
     gating_threshold = kalman_filter.chi2inv95[gating_dim]              # 门维度 == 4，返回一个门阈值
     measurements = np.asarray([det.to_xyah() for det in detections])
-    for row, track in enumerate(tracks):  # 每一个track，与全部的detections计算gating_distance，返回对象的长度与detections的长度相同
+    for row, track in enumerate(tracks):                # 每一个track，与全部的detections计算gating_distance，返回对象的长度与detections的长度相同
         gating_distance = kf.gating_distance(
             track.mean, track.covariance, measurements, only_position, metric='maha')
         cost_matrix[row, gating_distance > gating_threshold] = np.inf                       # 门距离 > 门阈值，设置为np.inf

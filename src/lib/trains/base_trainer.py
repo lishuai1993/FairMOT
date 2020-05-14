@@ -21,14 +21,13 @@ class ModleWithLoss(torch.nn.Module):
     return outputs[-1], loss, loss_stats
 
 class BaseTrainer(object):
-  def __init__(
-    self, opt, model, optimizer=None):
+  def __init__(self, opt, model, optimizer=None):
     self.opt = opt
     self.optimizer = optimizer
     self.loss_stats, self.loss = self._get_losses(opt)
-    self.model_with_loss = ModleWithLoss(model, self.loss)
+    self.model_with_loss = ModleWithLoss(model, self.loss)        # 继承自Module模块
 
-  def set_device(self, gpus, chunk_sizes, device):
+  def set_device(self, gpus, chunk_sizes, device):                # 设置并行，并移动到指定设备上
     if len(gpus) > 1:
       self.model_with_loss = DataParallel(
         self.model_with_loss, device_ids=gpus, 
@@ -55,30 +54,33 @@ class BaseTrainer(object):
     results = {}
     data_time, batch_time = AverageMeter(), AverageMeter()
     avg_loss_stats = {l: AverageMeter() for l in self.loss_stats}
-    num_iters = len(data_loader) if opt.num_iters < 0 else opt.num_iters
+    num_iters = len(data_loader) if opt.num_iters < 0 else opt.num_iters      # len(data_loader) = batch的数量
     bar = Bar('{}/{}'.format(opt.task, opt.exp_id), max=num_iters)
     end = time.time()
-    for iter_id, batch in enumerate(data_loader):
+
+    for iter_id, batch in enumerate(data_loader):                             # 迭代一个epoch
       if iter_id >= num_iters:
         break
       data_time.update(time.time() - end)
 
       for k in batch:
         if k != 'meta':
-          batch[k] = batch[k].to(device=opt.device, non_blocking=True)
+          batch[k] = batch[k].to(device=opt.device, non_blocking=True)      # 数据移动到指定设备
 
-      output, loss, loss_stats = model_with_loss(batch)
+      output, loss, loss_stats = model_with_loss(batch)                     # 前向传播
+
       loss = loss.mean()
       if phase == 'train':
         self.optimizer.zero_grad()
         loss.backward()
-        self.optimizer.step()
+        self.optimizer.step()                                               # 反向传播、更新
       batch_time.update(time.time() - end)
       end = time.time()
 
       Bar.suffix = '{phase}: [{0}][{1}/{2}]|Tot: {total:} |ETA: {eta:} '.format(
         epoch, iter_id, num_iters, phase=phase,
-        total=bar.elapsed_td, eta=bar.eta_td)
+        total=bar.elapsed_td, eta=bar.eta_td)                               # 值得学习，format
+
       for l in avg_loss_stats:
         avg_loss_stats[l].update(
           loss_stats[l].mean().item(), batch['input'].size(0))
@@ -94,7 +96,7 @@ class BaseTrainer(object):
       
       if opt.test:
         self.save_result(output, batch, results)
-      del output, loss, loss_stats, batch
+      del output, loss, loss_stats, batch                                   # 内存管理，及时清洗内存，值得学习
     
     bar.finish()
     ret = {k: v.avg for k, v in avg_loss_stats.items()}

@@ -85,7 +85,7 @@ class LoadImages:  # for inference
 class LoadVideo:  # for inference
     def __init__(self, path, img_size=(1088, 608)):
         self.cap = cv2.VideoCapture(path)
-        self.frame_rate = int(round(self.cap.get(cv2.CAP_PROP_FPS)))
+        self.frame_rate = int(round(self.cap.get(cv2.CAP_PROP_FPS)))            # 得到视频的帧率
         self.vw = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.vh = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.vn = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -111,7 +111,7 @@ class LoadVideo:  # for inference
         if self.count == len(self):
             raise StopIteration
         # Read image
-        res, img0 = self.cap.read()  # BGR
+        res, img0 = self.cap.read()                 # BGR，从视频中读取出每一帧
         assert img0 is not None, 'Failed to load frame {:d}'.format(self.count)
         img0 = cv2.resize(img0, (self.w, self.h))
 
@@ -364,10 +364,10 @@ class JointDataset(LoadImagesAndLabels):  # for training
             with open(path, 'r') as file:
                 self.img_files[ds] = file.readlines()
                 self.img_files[ds] = [osp.join(root, x.strip()) for x in self.img_files[ds]]
-                self.img_files[ds] = list(filter(lambda x: len(x) > 0, self.img_files[ds]))
+                self.img_files[ds] = list(filter(lambda x: len(x) > 0, self.img_files[ds]))             # 值得学习，filter与lambda
 
             self.label_files[ds] = [
-                x.replace('images', 'labels_with_ids').replace('.png', '.txt').replace('.jpg', '.txt')
+                x.replace('images', 'labels_with_ids').replace('.png', '.txt').replace('.jpg', '.txt')  # 值得学习
                 for x in self.img_files[ds]]
 
         for ds, label_paths in self.label_files.items():

@@ -148,7 +148,7 @@ class KalmanFilter(object):
             self._std_weight_position * mean[3]]
         innovation_cov = np.diag(np.square(std))                # 初始化噪声矩阵
         # 将均值向量、协方差矩阵映射到检测空间
-        mean = np.dot(self._update_mat, mean)
+        mean = np.dot(self._update_mat, mean)                   # 从8维的mean中取出前面四维
         covariance = np.linalg.multi_dot((
             self._update_mat, covariance, self._update_mat.T))
         return mean, covariance + innovation_cov
@@ -257,7 +257,7 @@ class KalmanFilter(object):
             mean, covariance = mean[:2], covariance[:2, :2]
             measurements = measurements[:, :2]
 
-        d = measurements - mean
+        d = measurements - mean                     #
         if metric == 'gaussian':
             return np.sum(d * d, axis=1)
         elif metric == 'maha':
